@@ -17,6 +17,8 @@ namespace ZombieParty.Models
         [Range(2, 5, ErrorMessage = "ValidationRange")]
         public int Point { get; set; }
 
+        public bool isDisponible { get; set; } = true;
+
         [DisplayName("Zombies")]
         [ValidateNever]
         public virtual List<Zombie>? Zombies { get; set; }

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using ZombieParty.Models;
 using ZombieParty.Models.Data;
+using ZombieParty.Services;
 using ZombieParty.Utility;
 using ZombieParty.ViewModels;
 
@@ -10,33 +11,43 @@ namespace ZombieParty.Controllers
 {
     public class ZombieTypeController : Controller
     {
-        private ZombiePartyDbContext _baseDonnees { get; set; }
+        private IZombieTypeService _serviceZT { get; set; }
 
-        public ZombieTypeController(ZombiePartyDbContext baseDonnees)
+        private readonly IZombieService _serviceZ;
+
+        public ZombieTypeController(IZombieTypeService serviceZT, IZombieService serviceZ)
         {
-            _baseDonnees = baseDonnees;
+            _serviceZT = serviceZT;
+            _serviceZ = serviceZ;
+
         }
+
 
         public async Task<IActionResult> Index()
         {
-            List<ZombieType> zombieTypesList = await _baseDonnees.ZombieTypes.ToListAsync();
-
-            return View(zombieTypesList);
+            return View(await _serviceZT.GetAllAsync());
         }
 
         public async Task<IActionResult> Details(int id)
         {
-            var zombies = await _baseDonnees.Zombies.Where(z => z.ZombieTypeId == id).ToListAsync();
+            ZombieType? zombieType = await _serviceZT.GetByIdAsync(id);
+
+            if (zombieType == null)
+            {
+                return NotFound();
+            }
+
+            var zombies = (await _serviceZ.GetAllByZombieTypeAsync(id)).ToList();
 
             ZombieTypeVM zombieTypeVM = new()
             {
-                ZombieType = new(),
+                ZombieType = zombieType,
                 ZombiesList = zombies,
                 ZombiesCount = zombies.Count(),
-                PointsAverage = zombies.Average(p => p.Point)
+                PointsAverage = zombies.Any()
+                    ? zombies.Average(p => p.Point)
+                    : 0
             };
-
-            zombieTypeVM.ZombieType = await _baseDonnees.ZombieTypes.FirstOrDefaultAsync(zt => zt.Id == id);
             return View(zombieTypeVM);
         }
 
@@ -56,8 +67,7 @@ namespace ZombieParty.Controllers
             if (ModelState.IsValid)
             {
                 // Ajouter à la BD
-               await  _baseDonnees.ZombieTypes.AddAsync(zombieType);
-                _baseDonnees.SaveChanges();
+                await _serviceZT.CreateAsync(zombieType);
                 TempData[AppConstants.Success] = $"{zombieType.TypeName} zombie type added";
                 return this.RedirectToAction("Index");
             }
@@ -65,10 +75,11 @@ namespace ZombieParty.Controllers
             return this.View(zombieType);
         }
 
+
         public async Task<IActionResult> Edit(int id)
         {
-            ZombieType? zombieType = await _baseDonnees.ZombieTypes.FindAsync(id);
-            
+            ZombieType? zombieType = await _serviceZT.GetByIdAsync(id);
+
             return View(zombieType);
         }
 
@@ -78,8 +89,9 @@ namespace ZombieParty.Controllers
         {
             if (ModelState.IsValid)
             {
-                _baseDonnees.ZombieTypes.Update(zombieType);
-               await _baseDonnees.SaveChangesAsync();
+                //_baseDonnees.ZombieTypes.Update(zombieType);
+                //await _baseDonnees.SaveChangesAsync();
+                await _serviceZT.EditAsync(zombieType);
                 TempData[AppConstants.Success] = $"ZombieType {zombieType.TypeName} has been modified";
                 return this.RedirectToAction("Index");
             }
@@ -89,7 +101,7 @@ namespace ZombieParty.Controllers
 
         public async Task<IActionResult> Delete(int id)
         {
-            ZombieType? zombieType = await _baseDonnees.ZombieTypes.FindAsync(id);
+            ZombieType? zombieType = await _serviceZT.GetByIdAsync(id);
             if (zombieType == null)
             {
                 return NotFound();
@@ -102,14 +114,13 @@ namespace ZombieParty.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeletePost(int id)
         {
-            ZombieType? zombieType = await _baseDonnees.ZombieTypes.FindAsync(id);
+            ZombieType? zombieType = await _serviceZT.GetByIdAsync(id);
             if (zombieType == null)
             {
                 return NotFound();
             }
 
-            _baseDonnees.ZombieTypes.Remove(zombieType);
-             await _baseDonnees.SaveChangesAsync();
+            await _serviceZT.DeleteAsync(id);
             TempData[AppConstants.Success] = $"ZombieType {zombieType.TypeName} has been removed";
             return RedirectToAction("Index");
         }
